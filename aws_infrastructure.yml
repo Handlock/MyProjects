@@ -1,0 +1,6 @@
+---
+- name: Deploy Infrastructure on AWS
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - aws_infrastructure
