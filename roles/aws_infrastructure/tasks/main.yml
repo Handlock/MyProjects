@@ -1,0 +1,58 @@
+---
+- name: Launch EC2 Instances
+  ec2_instance:
+    key_name: test_key
+    image_id: ami-xxxxx
+    instance_type: t2.micro
+    count: 2
+    wait: yes
+  register: ec2_instances
+
+- name: Create S3 Bucket
+  s3_bucket:
+    name: test-s3-bucket
+    state: present
+
+- name: Create RDS Instance
+  rds:
+    instance_name: test-db-instance
+    size: db.t2.micro
+    db_engine: postgres
+    db_name: test-database
+    db_username: admin
+    db_password: adminpassword
+    wait: yes
+  register: rds_instance
+
+- name: Create CloudWatch Log Group
+  cloudwatchlogs_log_group:
+    name: test-log-group
+    state: present
+
+- name: Create Application Load Balancer
+  ec2_lb:
+    name: test-lb
+    state: present
+    instances:
+      - "{{ ec2_instances.instance_ids }}"
+    wait: yes
+
+- name: Schedule RDS Backup
+  rds_snapshot:
+    db_instance_identifier: "{{ rds_instance.instance_id }}"
+    snapshot_type: automated
+    schedule: "cron(0 2 * * ? *)"
+  when: "'{{ lookup('pipe', 'date +%H') }}' == '02'"
+
+- name: Create Amazon EKS Cluster
+  eks_cluster:
+    name: test-eks-cluster
+    region: us-east-1
+    state: present
+    resources_vpc_config:
+      subnet_ids:
+        - subnet-xxxx
+        - subnet-yyyy
+      security_group_ids:
+        - sg-zzzzzzzzzzzzzzzzz
+    wait: yes
