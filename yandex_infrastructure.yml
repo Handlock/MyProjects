@@ -1,0 +1,8 @@
+---
+- name: Deploy Infrastructure on Yandex.Cloud
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - yandex_infrastructure
+  vars_files:
+    - secrets.yml
