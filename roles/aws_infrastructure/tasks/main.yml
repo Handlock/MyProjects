@@ -1,9 +1,54 @@
 ---
+- name: Create VPC
+  ec2_vpc:
+    state: present
+    region: us-east-1
+    cidr_block: 10.0.0.0/16
+    resource_tags:
+      - key: Name
+        value: test-vpc
+
+- name: Create Subnet 1
+  ec2_subnet:
+    state: present
+    region: us-east-1
+    vpc_id: "{{ vpc.id }}"
+    cidr: 10.0.0.0/24
+    resource_tags:
+      - key: Name
+        value: subnet-xxxxx
+
+- name: Create Subnet 2
+  ec2_subnet:
+    state: present
+    region: us-east-1
+    vpc_id: "{{ vpc.id }}"
+    cidr: 10.0.1.0/24
+    resource_tags:
+      - key: Name
+        value: subnet-yyyyy
+  
+- name: Create Security Group
+  ec2_group:
+    state: present
+    region: us-east-1
+    vpc_id: "{{ vpc.id }}"
+    name: sg-zzzzz
+    description: sg-zzzzz
+    rules:
+      - proto: tcp
+        from_port: 22
+        to_port: 22
+        cidr_ip: 0.0.0.0/0
+    resource_tags:
+      - key: Name
+        value: sg-zzzzz
+
 - name: Launch EC2 Instances
   ec2_instance:
     key_name: test_key
-    image_id: ami-xxxxx
-    instance_type: t2.micro
+    image_id: ami-xxxx
+    instance_type: e2-standard-2
     count: 2
     wait: yes
   register: ec2_instances
@@ -12,11 +57,12 @@
   s3_bucket:
     name: test-s3-bucket
     state: present
+    size: 100
 
 - name: Create RDS Instance
   rds:
     instance_name: test-db-instance
-    size: db.t2.micro
+    size: db.m5.large
     db_engine: postgres
     db_name: test-database
     db_username: admin
@@ -36,12 +82,13 @@
     instances:
       - "{{ ec2_instances.instance_ids }}"
     wait: yes
+    count: 5
 
 - name: Schedule RDS Backup
   rds_snapshot:
     db_instance_identifier: "{{ rds_instance.instance_id }}"
     snapshot_type: automated
-    schedule: "cron(0 2 * * ? *)"
+    schedule: "cron(0 2 * * ? *)"  # Резервное копирование каждый день в 02:00
   when: "'{{ lookup('pipe', 'date +%H') }}' == '02'"
 
 - name: Create Amazon EKS Cluster
@@ -51,8 +98,12 @@
     state: present
     resources_vpc_config:
       subnet_ids:
-        - subnet-xxxx
-        - subnet-yyyy
+        - subnet-xxxxx
+        - subnet-yyyyy
       security_group_ids:
-        - sg-zzzzzzzzzzzzzzzzz
+        - sg-zzzzz
     wait: yes
+    nodegroups:
+      - name: eks-ng
+        instance_type: t3.medium
+        desired_capacity: 2
