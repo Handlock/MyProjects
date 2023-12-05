@@ -1,0 +1,127 @@
+- hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Include encrypted variables
+      include_vars:
+        file: secrets.yml
+      vars:
+        yandex_access_key: "{{ access_key_from_secrets }}"
+        yandex_secret_key: "{{ secret_key_from_secrets }}"
+        db_user: "{{ db_user_from_secrets }}"
+        db_password: "{{ db_password_from_secrets }}"
+        db_name: "{{ db_name_from_secrets }}"
+
+- name: Create Yandex Cloud VPC
+  yandex_cloud_vpc:
+    name: test-vpc
+    folder_id: test-folder
+    description: Test VPC
+    subnet_count: 2
+    address_prefixes:
+      - 10.0.0.0/24
+      - 10.0.1.0/24
+    tags:
+      - key: Name
+        value: test-vpc
+
+- name: Create Yandex Cloud Subnet 1
+  yandex_cloud_subnet:
+    name: test-subnet-1
+    folder_id: test-folder
+    network_id: test-vpc
+    zone: ru-central1-a
+    v4_cidr_blocks:
+      - 10.0.0.0/24
+
+- name: Create Yandex Cloud Subnet 2
+  yandex_cloud_subnet:
+    name: test-subnet-2
+    folder_id: test-folder
+    network_id: test-vpc
+    zone: ru-central1-b
+    v4_cidr_blocks:
+      - 10.0.1.0/24
+
+- name: Create Yandex Cloud Security Group
+  yandex_cloud_vpc_security_group:
+    name: test-security-group
+    folder_id: test-folder
+    description: Test Security Group
+    network_id: test-vpc
+
+- name: Add Firewall Rule to Security Group
+  yandex_cloud_vpc_security_group_rule:
+    security_group_id: test-security-group
+    direction: ingress
+    port_range:
+      start: 22
+      end: 22
+    protocol: tcp
+    description: Allow SSH
+
+- name: Launch Yandex Cloud Compute Instances
+  yandex_cloud_compute_instance:
+    name: test-instance
+    folder_id: test-folder
+    zone: ru-central1-a
+    cores: 2
+    memory: 3.75
+    boot_disk:
+      size: 20
+    network_interfaces:
+      - subnet_id: test-subnet-1
+        security_group_ids:
+          - test-security-group
+    count: 2
+  register: yc_instances
+
+- name: Create Yandex Cloud Object Storage Bucket
+  yandex_cloud_object_storage_bucket:
+    name: test-s3-bucket
+    location: ru-central1
+    storage_class: standard
+    access_key: "{{ access_key_from_secrets }}"
+    secret_key: "{{ secret_key_from_secrets }}"
+
+- name: Create Yandex Cloud Managed Database
+  yandex_cloud_mdb_mysql:
+    name: test-db-instance
+    folder_id: test-folder
+    availability_zone: ru-central1-a
+    network_id: test-vpc
+    subnet_ids:
+      - test-subnet-1
+      - test-subnet-2
+    user: "{{ db_user }}"
+    password: "{{ db_password }}"
+    database: "{{ db_name }}"
+    resource_preset: s2.micro
+    backup_window_start: "02:00"
+
+- name: Create Yandex Cloud Log Group
+  yandex_cloud_logging_log_group:
+    name: test-log-group
+    folder_id: test-folder
+
+- name: Create Yandex Cloud Load Balancer
+  yandex_cloud_load_balancer:
+    name: test-lb
+    region: ru-central1
+    backend:
+      target_groups:
+        - name: test-target-group
+          healthcheck_name: http
+          healthcheck_port: 80
+          healthcheck_interval: 5
+          healthcheck_timeout: 2
+          healthcheck_unhealthy_threshold: 2
+    listeners:
+      - name: test-listener
+        port: 80
+        target_port: 80
+    network_id: test-vpc
+    subnet_ids:
+      - test-subnet-1
+      - test-subnet-2
+    security_group_ids:
+      - test-security-group
