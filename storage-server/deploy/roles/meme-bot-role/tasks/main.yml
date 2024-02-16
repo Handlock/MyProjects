@@ -1,0 +1,62 @@
+---
+# init release
+- name: Initialize the deploy root and gather facts
+  community.general.deploy_helper:
+    path: "{{ project_root }}"
+# Debugging the facts returned by the module
+- community.general.deploy_helper:
+    path: "{{ project_root }}"
+- ansible.builtin.debug:
+    var: deploy_helper
+# checkout
+- name: Create release directory
+  ansible.builtin.file:
+    path: "{{ deploy_helper.new_release_path }}"
+    state: directory
+- name: Add an unfinished file, to allow cleanup on successful finalize
+  ansible.builtin.file:
+    path: '{{ deploy_helper.new_release_path }}/{{ deploy_helper.unfinished_filename }}'
+    state: touch
+- name: Copy shared config to release directory
+  ansible.builtin.copy:
+    src: '{{ deploy_helper.shared_path }}/{{ item.src }}'
+    dest: '{{ deploy_helper.new_release_path }}/{{ item.path }}'
+    remote_src: yes
+  with_items:
+    - path: .env
+      src: shared/.env
+- name: Add release version to config file
+  ansible.builtin.lineinfile:
+    path: '{{ deploy_helper.new_release_path }}/.env'
+    state: present
+    line: "{{ item.config_item }}={{ lookup('env', item.variable) }}"
+  loop:
+    - variable: CI_REGISTRY_IMAGE
+      config_item: SYNC_SERVICE_IMAGE
+    - variable: CI_COMMIT_SHORT_SHA
+      config_item: SYNC_SERVICE_VERSION
+- name: Copy compose file
+  ansible.builtin.copy:
+    src: "{{ playbook_dir}}/../../docker-compose.yml"
+    dest: "{{ deploy_helper.new_release_path }}/docker-compose.yml"
+- name: Docker login
+  docker_login:
+    registry: "{{ lookup('env', 'CI_REGISTRY') }}"
+    username: "{{ lookup('env', 'CI_REGISTRY_USER') }}"
+    password: "{{ lookup('env', 'CI_REGISTRY_PASSWORD') }}"
+    reauthorize: yes
+#- name: Start application
+- name: Start application
+  community.docker.docker_compose:
+    project_name: meme-bot
+    project_src: "{{ deploy_helper.new_release_path }}"
+    build: no
+    pull: yes
+    state: present
+# finalize deploy
+- name: Finalize the deploy, removing the unfinished file and switching the symlink
+  community.general.deploy_helper:
+    path: "{{ project_root }}"
+    release: '{{ deploy_helper.new_release }}'
+    state: finalize
+    keep_releases: 10

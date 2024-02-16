@@ -1,0 +1,17 @@
+stages:
+  - deploy
+
+variables:
+  CI_REGISTRY_IMAGE: $CI_REGISTRY/$CI_PROJECT_PATH
+  BOT_USERNAME: $BOT_USERNAME
+  BOT_TOKEN: $BOT_TOKEN
+
+deploy:
+  stage: deploy
+  tags:
+    - meme-bot
+  script:
+    - docker-compose -f docker/docker_compose.yaml up -d
+    - ansible-playbook -i inventory -l ${DEPLOY_HOST} -u deploy --private-key=${DEPLOY_SSH_KEY} roles/meme-bot-role/tasks/main.yml --extra-vars "bot_token=$BOT_TOKEN bot_username=$BOT_USERNAME"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG != null'

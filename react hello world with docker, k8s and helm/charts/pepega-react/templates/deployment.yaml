@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Deployment
+metadata:
+  name: pepega-react
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pepega-react
+  template:
+    metadata:
+      labels:
+        app: pepega-react
+    spec:
+      containers:
+        - name: pepega-react
+          image: $CI_REGISTRY/pepega-react:latest
+          ports:
+            - containerPort: 3000

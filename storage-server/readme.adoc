@@ -1,0 +1,29 @@
+:toc: auto
+:stylesheet: spring.css
+:doctype: book
+:toc-title: Table of contents
+toc::[]
+
+= Meme storage server project documentation
+
+== Requirements
+
+. Maven 3.8.1
+. Java 21
+. PostgreSQL 16.1
+. Docker
+. Docker Compose
+
+== Build and run locally
+
+To run locally you firstly need to start database.
+
+Database starting by running following command from link:docker/[docker] directory:
+
+[source,shell]
+----
+docker-compose up --build -d postgres
+----
+
+After applying this command you can access database on port **15432**.
+

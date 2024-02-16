@@ -1,0 +1,5 @@
+- name: Deploy meme bot project
+  hosts: all
+
+  roles:
+    - meme-bot-role
